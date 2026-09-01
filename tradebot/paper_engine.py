@@ -44,7 +44,7 @@ class PaperTradingEngine:
 
     def _closing_prices(self):
         candles = self.client.get_candles(self.config.symbol, self.config.candle_interval)
-        rows = candles.get("candles", candles if isinstance(candles, list) else [])
+        rows = candles.get("data", candles if isinstance(candles, list) else [])
         return [float(c["close"]) for c in rows]
 
     def step(self):

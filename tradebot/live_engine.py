@@ -28,18 +28,18 @@ class LiveTradingEngine:
 
     def _closing_prices(self):
         candles = self.client.get_candles(self.config.symbol, self.config.candle_interval)
-        rows = candles.get("candles", candles if isinstance(candles, list) else [])
+        rows = candles.get("data", candles if isinstance(candles, list) else [])
         return [float(c["close"]) for c in rows]
 
     def _base_currency(self):
-        return self.config.symbol.split("-")[0]
+        return self.config.symbol.split("/")[0]
 
     def _quote_currency(self):
-        return self.config.symbol.split("-")[1]
+        return self.config.symbol.split("/")[1]
 
     def _available_balance(self, currency):
         balances = self.client.get_balances()
-        rows = balances.get("balances", balances if isinstance(balances, list) else [])
+        rows = balances.get("data", balances if isinstance(balances, list) else [])
         for b in rows:
             if b.get("currency") == currency:
                 return float(b.get("available", 0))

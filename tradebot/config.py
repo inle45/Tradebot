@@ -9,12 +9,14 @@ class Config:
     private_key_path = os.environ.get("REVX_PRIVATE_KEY_PATH", "./private.pem")
     api_key = os.environ.get("REVX_API_KEY", "")
 
-    symbol = os.environ.get("TRADEBOT_SYMBOL", "SOL-EUR")
+    symbol = os.environ.get("TRADEBOT_SYMBOL", "SOL/EUR")
     max_position_eur = float(os.environ.get("TRADEBOT_MAX_POSITION_EUR", "100"))
 
     sma_short = int(os.environ.get("TRADEBOT_SMA_SHORT", "10"))
     sma_long = int(os.environ.get("TRADEBOT_SMA_LONG", "50"))
-    candle_interval = os.environ.get("TRADEBOT_CANDLE_INTERVAL", "1h")
+    # Intervalle des bougies en minutes. Valeurs acceptées par l'API Revolut X:
+    # 1, 5, 15, 30, 60, 240, 1440, 2880, 5760, 10080, 20160, 40320
+    candle_interval = os.environ.get("TRADEBOT_CANDLE_INTERVAL", "60")
 
     confirm_live = os.environ.get("TRADEBOT_CONFIRM_LIVE", "no").strip().lower() == "yes"
 

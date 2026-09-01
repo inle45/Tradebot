@@ -46,7 +46,7 @@ pip install -r requirements.txt
    ```
    - `REVX_API_KEY` : ta clé API
    - `REVX_PRIVATE_KEY_PATH` : chemin vers `private.pem`
-   - `TRADEBOT_SYMBOL` : paire à trader (ex: `SOL-EUR`)
+   - `TRADEBOT_SYMBOL` : paire à trader (ex: `SOL/EUR`)
    - `TRADEBOT_MAX_POSITION_EUR` : plafond max engagé en mode réel
 
 ## Utilisation

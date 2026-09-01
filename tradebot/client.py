@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import requests
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -70,16 +70,16 @@ class RevxClient:
 
     def get_ticker(self, symbol):
         data = self._request("GET", "/1.0/public/tickers", authenticated=False)
-        for ticker in data.get("tickers", data if isinstance(data, list) else []):
+        for ticker in data.get("data", data if isinstance(data, list) else []):
             if ticker.get("symbol") == symbol:
                 return ticker
         raise RevxApiError(f"Symbole {symbol} introuvable dans les tickers")
 
-    def get_candles(self, symbol, interval, limit=100):
+    def get_candles(self, symbol, interval_minutes, limit=100):
         return self._request(
             "GET",
-            f"/1.0/public/candles/{symbol}",
-            params={"interval": interval, "limit": limit},
+            f"/1.0/public/candles/{quote(symbol, safe='')}",
+            params={"interval": interval_minutes, "limit": limit},
             authenticated=False,
         )
 
