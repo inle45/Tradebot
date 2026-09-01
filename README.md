@@ -7,23 +7,32 @@ bancaire classique).
 ⚠️ **Ceci n'est pas un conseil financier.** Le trading automatique comporte
 un risque de perte. Teste toujours en mode simulation avant de passer en réel.
 
-## ⚠️ Résultat du backtest : la stratégie ne bat pas l'inaction
+## ⚠️ Résultat mesuré : aucun avantage détectable
 
-Testée sur ~33 jours réels de SOL/EUR, frais inclus :
+La stratégie a été validée en **walk-forward** (paramètres optimisés sur une
+période, testés sur la période suivante jamais vue) sur **11 paires et 44
+périodes** de validation, frais inclus :
 
-| | Résultat |
+| Mesure | Résultat |
 |---|---|
-| Bot (moyennes mobiles) | **-0,88 %** |
-| Acheter et ne rien faire | **+37,13 %** |
+| Périodes où le bot bat l'inaction | **21/44 (48 %)** — un pile ou face |
+| Écart moyen vs buy & hold | +1,9 points |
+| Intervalle de confiance à 95 % | **−5,4 à +9,2 points** (contient zéro) |
+| Probabilité d'obtenir ce score par pur hasard | **67 %** |
 
-**Aucun** des 15 jeux de paramètres testés (`python -m tradebot.backtest --grid`)
-ne bat le buy & hold sur cette période. En clair : sur ces données, laisser le
-bot trader aurait fait perdre de l'argent par rapport au fait de simplement
-garder ses SOL.
+**Conclusion : rien ne distingue cette stratégie du hasard.** L'écart moyen
+légèrement positif n'est pas significatif (t = 0,52, il en faudrait ~2,2), et
+les paires crypto étant très corrélées, l'incertitude réelle est encore plus
+grande que ces chiffres ne le suggèrent.
 
-Ce dépôt reste utile comme **outil de mesure** : il permet de tester n'importe
-quelle stratégie avant d'y mettre de l'argent. Mais en l'état, il ne faut pas
-lancer le mode réel en espérant un gain.
+Ce dépôt vaut donc surtout comme **outil de mesure** : il permet de tester
+n'importe quelle stratégie avant d'y mettre un centime. Mais lancer le mode
+réel avec la stratégie actuelle revient à jouer à pile ou face en payant des
+frais à chaque lancer.
+
+```bash
+python -m tradebot.walkforward --interval 240   # refaire la mesure
+```
 
 ## Comment ça marche
 
@@ -95,9 +104,29 @@ et **Backtest** (test de la stratégie sur l'historique, comparé au buy & hold)
 ### Backtest en ligne de commande
 
 ```bash
-python -m tradebot.backtest          # test avec les réglages du .env
-python -m tradebot.backtest --grid   # classement de plusieurs jeux de paramètres
-python -m tradebot.backtest --maker  # en simulant des ordres à 0% de frais
+python -m tradebot.backtest             # test avec les réglages du .env
+python -m tradebot.backtest --grid      # classement de plusieurs jeux de paramètres
+python -m tradebot.backtest --maker     # en simulant des ordres à 0% de frais
+python -m tradebot.backtest --multi     # sur les 20 paires les plus liquides
+python -m tradebot.backtest --interval 1440   # bougies journalières = ~10 mois d'historique
+```
+
+### Validation walk-forward (le test qui compte)
+
+```bash
+python -m tradebot.walkforward --interval 240
+```
+
+Un backtest classique choisit les meilleurs paramètres *sur les données déjà
+vues* — c'est du surapprentissage, et ça donne des résultats flatteurs qui ne
+se reproduisent jamais. Le walk-forward optimise sur une fenêtre puis évalue
+sur la **suivante, jamais vue**, en avançant dans le temps. Seuls ces
+résultats-là ressemblent à ce qu'on vivrait en vrai.
+
+La sortie compare explicitement les deux :
+```
+Rendement moyen pendant l'optimisation : +8.0%   <- ce qu'on croit obtenir
+Rendement moyen sur données inconnues  : +9.3%   <- ce qu'on obtient vraiment
 ```
 
 ### Option B — en ligne de commande

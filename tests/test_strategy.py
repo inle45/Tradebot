@@ -125,6 +125,30 @@ def test_backtest_fees_reduce_return():
     print("  ok  les frais réduisent bien le résultat")
 
 
+def test_walk_forward_only_scores_unseen_data():
+    """La validation walk-forward ne doit jamais noter une période qui a servi
+    à choisir les paramètres : les fenêtres de test doivent suivre les fenêtres
+    d'entraînement, sans chevauchement."""
+    from tradebot.walkforward import walk_forward
+
+    prices = [10 + (i % 17) * 0.5 + i * 0.05 for i in range(400)]
+    outcome = walk_forward(
+        candles_from(prices),
+        param_sets=[bare_config(), bare_config(sma_short=5, sma_long=20)],
+        train=150, test=50,
+    )
+    assert outcome["fold_count"] >= 2
+    for fold in outcome["folds"]:
+        train_start, train_end = fold["train_range"]
+        test_start, test_end = fold["test_range"]
+        assert test_start >= train_end, "la validation empiète sur l'entraînement"
+        assert test_end > test_start
+    # Le capital se transmet bien d'une fenêtre à la suivante
+    for previous, following in zip(outcome["folds"], outcome["folds"][1:]):
+        assert following["capital_before"] == previous["capital_after"]
+    print("  ok  walk-forward n'évalue que des données inconnues")
+
+
 if __name__ == "__main__":
     print("\nTests de la stratégie\n")
     for name, fn in sorted(globals().items()):
