@@ -51,6 +51,22 @@ pip install -r requirements.txt
 
 ## Utilisation
 
+### Option A — le tableau de bord web (recommandé)
+
+```bash
+python -m tradebot.dashboard
+```
+Puis ouvre **http://127.0.0.1:8000** dans ton navigateur. Tu y trouves le prix
+en direct, le signal courant, la valeur du portefeuille et des boutons
+Démarrer / Arrêter — plus besoin de terminal au quotidien.
+
+Le dashboard n'écoute que sur `127.0.0.1`, donc il est accessible uniquement
+depuis l'appareil qui le fait tourner (personne d'autre sur le réseau ne peut
+l'ouvrir). Il n'utilise que la bibliothèque standard de Python : aucune
+dépendance supplémentaire à installer.
+
+### Option B — en ligne de commande
+
 **Étape 1 — toujours commencer par la simulation :**
 ```bash
 python -m tradebot.bot --mode paper

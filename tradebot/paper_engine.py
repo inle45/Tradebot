@@ -51,7 +51,7 @@ class PaperTradingEngine:
         prices = self._closing_prices()
         if not prices:
             logger.warning("Aucune donnée de prix reçue, on attend le prochain cycle")
-            return
+            return None
         current_price = prices[-1]
         signal = self.strategy.next_signal(prices)
 
@@ -66,6 +66,16 @@ class PaperTradingEngine:
             signal.value,
             self.portfolio.value(current_price),
         )
+        return {
+            "mode": "paper",
+            "symbol": self.config.symbol,
+            "price": current_price,
+            "signal": signal.value,
+            "cash_eur": self.portfolio.cash_eur,
+            "position_base": self.portfolio.position_base,
+            "value_eur": self.portfolio.value(current_price),
+            "initial_eur": self.config.max_position_eur,
+        }
 
     def run_forever(self):
         logger.info(

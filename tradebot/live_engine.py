@@ -72,7 +72,7 @@ class LiveTradingEngine:
         prices = self._closing_prices()
         if not prices:
             logger.warning("Aucune donnée de prix reçue, on attend le prochain cycle")
-            return
+            return None
         signal = self.strategy.next_signal(prices)
 
         if signal == Signal.BUY:
@@ -81,6 +81,19 @@ class LiveTradingEngine:
             self._sell()
 
         logger.info("Prix=%.4f Signal=%s", prices[-1], signal.value)
+
+        base = self._available_balance(self._base_currency())
+        cash = self._available_balance(self._quote_currency())
+        return {
+            "mode": "live",
+            "symbol": self.config.symbol,
+            "price": prices[-1],
+            "signal": signal.value,
+            "cash_eur": cash,
+            "position_base": base,
+            "value_eur": cash + base * prices[-1],
+            "initial_eur": self.config.max_position_eur,
+        }
 
     def run_forever(self):
         self.config.validate_for_live()
