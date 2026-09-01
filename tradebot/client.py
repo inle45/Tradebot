@@ -109,5 +109,36 @@ class RevxClient:
         }
         return self._request("POST", "/1.0/orders", body_obj=body)
 
+    def place_limit_order(
+        self, symbol, side, client_order_id, price, base_size, post_only=True
+    ):
+        """Ordre limite. Avec post_only, l'ordre est rejeté s'il s'exécuterait
+        immédiatement — ce qui garantit le tarif "maker" (0% sur Revolut X au
+        lieu de 0,09% en taker), au prix d'une exécution non garantie."""
+        body = {
+            "client_order_id": client_order_id,
+            "symbol": symbol,
+            "side": side,
+            "order_configuration": {
+                "limit": {
+                    "price": str(price),
+                    "base_size": str(base_size),
+                    "execution_instructions": ["post_only"] if post_only else ["allow_taker"],
+                }
+            },
+        }
+        return self._request("POST", "/1.0/orders", body_obj=body)
+
+    def get_order(self, venue_order_id):
+        return self._request("GET", f"/1.0/orders/{venue_order_id}")
+
     def cancel_order(self, venue_order_id):
         return self._request("DELETE", f"/1.0/orders/{venue_order_id}")
+
+    def get_order_book(self, symbol, limit=5):
+        return self._request(
+            "GET",
+            f"/2.0/public/order-book/{quote(symbol, safe='')}",
+            params={"limit": limit},
+            authenticated=False,
+        )

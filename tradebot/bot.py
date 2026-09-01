@@ -35,7 +35,7 @@ def main():
     setup_logging()
 
     client = RevxClient(Config)
-    strategy = SmaCrossoverStrategy(Config.sma_short, Config.sma_long)
+    strategy = SmaCrossoverStrategy(Config.strategy_config())
 
     if args.mode == "live":
         confirmation = input(

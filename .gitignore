@@ -6,3 +6,6 @@ __pycache__/
 venv/
 logs/
 *.log
+
+# Fichiers d etat du bot
+state*.json

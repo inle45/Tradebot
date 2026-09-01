@@ -7,6 +7,24 @@ bancaire classique).
 ⚠️ **Ceci n'est pas un conseil financier.** Le trading automatique comporte
 un risque de perte. Teste toujours en mode simulation avant de passer en réel.
 
+## ⚠️ Résultat du backtest : la stratégie ne bat pas l'inaction
+
+Testée sur ~33 jours réels de SOL/EUR, frais inclus :
+
+| | Résultat |
+|---|---|
+| Bot (moyennes mobiles) | **-0,88 %** |
+| Acheter et ne rien faire | **+37,13 %** |
+
+**Aucun** des 15 jeux de paramètres testés (`python -m tradebot.backtest --grid`)
+ne bat le buy & hold sur cette période. En clair : sur ces données, laisser le
+bot trader aurait fait perdre de l'argent par rapport au fait de simplement
+garder ses SOL.
+
+Ce dépôt reste utile comme **outil de mesure** : il permet de tester n'importe
+quelle stratégie avant d'y mettre de l'argent. Mais en l'état, il ne faut pas
+lancer le mode réel en espérant un gain.
+
 ## Comment ça marche
 
 Le bot suit une stratégie simple : **croisement de moyennes mobiles**.
@@ -14,11 +32,17 @@ Le bot suit une stratégie simple : **croisement de moyennes mobiles**.
 - Quand la courte dépasse la longue → il achète (tendance haussière).
 - Quand la courte repasse en dessous → il vend (tendance qui s'essouffle).
 
+S'y ajoutent trois protections :
+- **Filtre de tendance** : pas d'achat si le prix est sous sa moyenne 200 périodes.
+- **Filtre de volatilité (ATR)** : pas de trade en marché trop plat.
+- **Stop-loss / trailing stop** : sortie automatique en cas de chute.
+
 Deux modes :
 - **`paper`** (par défaut) : simulation avec de vrais prix mais un portefeuille
-  virtuel. Aucun argent réel n'est touché.
+  virtuel. Aucun argent réel n'est touché. Les frais sont simulés.
 - **`live`** : place de vrais ordres sur ton compte Revolut X, avec un plafond
-  de dépense codé en dur pour limiter le risque.
+  de dépense pour limiter le risque. Utilise des ordres limites *post-only*
+  (0 % de frais au lieu de 0,09 %).
 
 ## Installation
 
@@ -63,7 +87,18 @@ Démarrer / Arrêter — plus besoin de terminal au quotidien.
 Le dashboard n'écoute que sur `127.0.0.1`, donc il est accessible uniquement
 depuis l'appareil qui le fait tourner (personne d'autre sur le réseau ne peut
 l'ouvrir). Il n'utilise que la bibliothèque standard de Python : aucune
-dépendance supplémentaire à installer.
+dépendance supplémentaire à installer, graphique compris.
+
+Il contient deux onglets : **En direct** (prix, graphique, position, contrôles)
+et **Backtest** (test de la stratégie sur l'historique, comparé au buy & hold).
+
+### Backtest en ligne de commande
+
+```bash
+python -m tradebot.backtest          # test avec les réglages du .env
+python -m tradebot.backtest --grid   # classement de plusieurs jeux de paramètres
+python -m tradebot.backtest --maker  # en simulant des ordres à 0% de frais
+```
 
 ### Option B — en ligne de commande
 
@@ -81,17 +116,30 @@ python -m tradebot.bot --mode live
 ```
 Une confirmation manuelle (taper `OUI`) est aussi demandée avant démarrage.
 
+## Tests
+
+```bash
+python -m tests.test_strategy
+```
+
 ## Garde-fous inclus
 
 - Le mode réel refuse de démarrer sans clé API + clé privée + confirmation explicite.
 - Un achat en mode réel n'engage jamais plus que `TRADEBOT_MAX_POSITION_EUR`.
+- Stop-loss à -5 % par défaut.
+- L'état (position en cours) est sauvegardé sur disque : un redémarrage ne fait
+  pas oublier au bot qu'il détient une position.
 - Toutes les décisions (simulation et réel) sont journalisées dans `logs/tradebot.log`.
 
 ## Limites connues
 
-- La stratégie moyennes mobiles est volontairement simple — elle ne garantit
-  aucun gain, et peut perdre de l'argent en marché sans tendance claire.
-- Les noms exacts des champs retournés par l'API Revolut X (`get_candles`,
-  `get_balances`) sont basés sur la documentation publique ; un premier essai
-  en mode `paper` peut révéler de petits ajustements à faire si le format
-  réel diffère légèrement.
+- **La stratégie ne bat pas le buy & hold** sur les données testées (voir plus haut).
+- La détection de croisement est simple et connue de tous ; il ne faut pas
+  s'attendre à un avantage sur le marché.
+- Les endpoints authentifiés (soldes, passage d'ordres) n'ont pas pu être
+  testés de bout en bout faute de compte de test : le premier passage en mode
+  réel peut demander de petits ajustements de format, comme il a fallu en faire
+  pour les endpoints publics.
+- `--grid` sert à vérifier qu'une stratégie n'est pas rentable *uniquement* par
+  chance sur un réglage précis. Choisir le meilleur réglage du classement =
+  surapprentissage, et ça ne se reproduira pas sur le futur.
