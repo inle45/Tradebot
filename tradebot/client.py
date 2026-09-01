@@ -33,14 +33,8 @@ class RevxClient:
         signature = self._load_private_key().sign(message)
         return base64.b64encode(signature).decode("ascii")
 
-    def _request(self, method, path, params=None, body_obj=None, authenticated=True):
-        query_string = ""
-        if params:
-            query_string = "?" + urlencode(sorted(params.items()))
-
-        body = json.dumps(body_obj, separators=(",", ":")) if body_obj is not None else ""
+    def _send_once(self, method, path, query_string, body, body_obj, authenticated):
         url = self.config.base_url + path + query_string
-
         headers = {"Content-Type": "application/json"}
         if authenticated:
             timestamp_ms = str(int(time.time() * 1000))
@@ -54,17 +48,49 @@ class RevxClient:
                     ),
                 }
             )
-
-        response = self.session.request(
+        return self.session.request(
             method, url, data=body if body_obj is not None else None, headers=headers
         )
-        if response.status_code == 429:
-            raise RevxApiError(
-                f"Rate limit atteint, retry après {response.headers.get('Retry-After')} ms"
+
+    def _request(self, method, path, params=None, body_obj=None, authenticated=True,
+                 retries=4):
+        query_string = ""
+        if params:
+            query_string = "?" + urlencode(sorted(params.items()))
+        body = json.dumps(body_obj, separators=(",", ":")) if body_obj is not None else ""
+
+        # Les ordres ne sont jamais rejoués automatiquement : en cas de doute sur
+        # un POST /orders, mieux vaut remonter l'erreur que risquer un doublon.
+        idempotent = method in ("GET", "DELETE")
+        attempts = retries if idempotent else 1
+
+        for attempt in range(attempts):
+            response = self._send_once(
+                method, path, query_string, body, body_obj, authenticated
             )
-        if not response.ok:
-            raise RevxApiError(f"{method} {path} -> {response.status_code}: {response.text}")
-        return response.json() if response.content else {}
+
+            if response.status_code == 429 and attempt < attempts - 1:
+                # L'API indique le délai à respecter en millisecondes
+                header = response.headers.get("Retry-After", "1000")
+                try:
+                    delay = float(header) / 1000
+                except ValueError:
+                    delay = 1.0
+                time.sleep(max(delay, 0.2) * (attempt + 1))
+                continue
+
+            if response.status_code == 429:
+                raise RevxApiError(
+                    f"Rate limit atteint après {attempts} tentatives sur {path}"
+                )
+            if response.status_code >= 500 and attempt < attempts - 1:
+                time.sleep(2**attempt)
+                continue
+            if not response.ok:
+                raise RevxApiError(
+                    f"{method} {path} -> {response.status_code}: {response.text}"
+                )
+            return response.json() if response.content else {}
 
     # --- Données de marché publiques (pas besoin de clé API) ---
 
