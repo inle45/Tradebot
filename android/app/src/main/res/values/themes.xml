@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.Tradebot" parent="android:Theme.Material.NoActionBar"/>
+</resources>
