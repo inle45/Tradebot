@@ -33,17 +33,28 @@ def _max_drawdown(equity_curve):
     return worst
 
 
+def as_strategy(spec):
+    """Accepte soit une StrategyConfig (moyennes mobiles), soit n'importe quelle
+    stratégie exposant `decide()` et `warmup`."""
+    if spec is None:
+        return SmaCrossoverStrategy(StrategyConfig())
+    if isinstance(spec, StrategyConfig):
+        return SmaCrossoverStrategy(spec)
+    return spec
+
+
 def run_backtest(candles, strategy_config=None, initial_eur=100.0, fee=TAKER_FEE):
     """Rejoue la stratégie bougie par bougie. Retourne les métriques, la courbe
     de capital et la liste des trades."""
-    strategy = SmaCrossoverStrategy(strategy_config or StrategyConfig())
-    warmup = strategy.config.warmup
+    strategy = as_strategy(strategy_config)
+    warmup = strategy.warmup
 
     cash = initial_eur
     position = None
     trades = []
     equity_curve = []
     entry_index = 0
+    bars_in_market = 0
 
     for i in range(warmup, len(candles)):
         window = candles[: i + 1]
@@ -73,6 +84,8 @@ def run_backtest(candles, strategy_config=None, initial_eur=100.0, fee=TAKER_FEE
             cash = proceeds
             position = None
 
+        if position:
+            bars_in_market += 1
         value = cash + (position.size * price if position else 0.0)
         equity_curve.append({"time": window[-1].get("start"), "value": value, "price": price})
 
@@ -99,6 +112,9 @@ def run_backtest(candles, strategy_config=None, initial_eur=100.0, fee=TAKER_FEE
         "worst_trade_pct": min((t["profit_pct"] for t in trades), default=0.0),
         "max_drawdown_pct": _max_drawdown(values),
         "hold_max_drawdown_pct": _max_drawdown([p["price"] for p in equity_curve]),
+        # Part du temps réellement investi. Une stratégie peu exposée "bat"
+        # mécaniquement le buy & hold en marché baissier, sans aucun mérite.
+        "exposure": (bars_in_market / len(equity_curve)) if equity_curve else 0.0,
         "candles_tested": len(candles) - warmup,
         "still_in_position": position is not None,
         "trade_list": trades,

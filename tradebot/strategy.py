@@ -83,10 +83,18 @@ def atr(candles, period):
 
 
 class SmaCrossoverStrategy:
-    def __init__(self, config=None):
+    name = "Moyennes mobiles"
+
+    def __init__(self, config=None, name=None):
         self.config = config or StrategyConfig()
         if self.config.sma_short >= self.config.sma_long:
             raise ValueError("sma_short doit être inférieur à sma_long")
+        if name:
+            self.name = name
+
+    @property
+    def warmup(self):
+        return self.config.warmup
 
     def _crossover(self, closes):
         """Retourne 'up', 'down' ou None en comparant l'état actuel au précédent."""
