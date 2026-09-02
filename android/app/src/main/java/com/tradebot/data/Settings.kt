@@ -87,9 +87,32 @@ class Settings(context: Context) {
         )
     }
 
+    // --- Référence de performance en mode réel ---
+    //
+    // Le champ « capital / plafond » borne ce que le bot peut engager ; ce n'est
+    // pas un capital de départ. Comparer un compte réel à ce nombre afficherait
+    // un gain inventé. On retient donc la valeur du compte au premier cycle réel,
+    // par paire, et on mesure l'écart depuis ce point.
+
+    private fun baselineKey(symbol: String) = "live_baseline_$symbol"
+
+    fun liveBaseline(symbol: String): Double? =
+        if (prefs.contains(baselineKey(symbol)))
+            prefs.getFloat(baselineKey(symbol), 0f).toDouble()
+        else null
+
+    fun saveLiveBaseline(symbol: String, value: Double) {
+        prefs.edit().putFloat(baselineKey(symbol), value.toFloat()).apply()
+    }
+
     fun resetPortfolio() {
-        prefs.edit()
-            .remove("pos_entry").remove("pos_size").remove("pos_peak").remove("cash")
-            .apply()
+        prefs.edit().apply {
+            remove("pos_entry"); remove("pos_size"); remove("pos_peak"); remove("cash")
+            // La référence du mode réel repart aussi de zéro, sinon l'écart
+            // affiché se mesurerait depuis un point qui n'a plus de sens.
+            for (key in prefs.all.keys) {
+                if (key.startsWith("live_baseline_")) remove(key)
+            }
+        }.apply()
     }
 }

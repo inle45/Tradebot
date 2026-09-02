@@ -26,7 +26,14 @@ data class EngineState(
     /** Devise avec laquelle on achète : "EUR" pour SOL/EUR, "USDC" pour SOL/USDC. */
     val quoteCurrency: String = "EUR",
     val portfolioValue: Double = 0.0,
+    /**
+     * Valeur de référence à laquelle comparer le portefeuille. En simulation
+     * c'est le capital de départ ; en réel, la valeur du compte au premier
+     * cycle — le plafond de Réglages n'est pas un capital investi.
+     */
     val initialEur: Double = 100.0,
+    /** Ce que mesure l'écart affiché, pour ne pas le faire passer pour autre chose. */
+    val referenceLabel: String = "capital de départ",
     val indicators: Map<String, Double> = emptyMap(),
     val candles: List<Candle> = emptyList(),
     val lastUpdate: Long = 0L,
@@ -118,6 +125,16 @@ class TradingEngine(
         } else {
             cash + (position?.let { it.size * price } ?: 0.0)
         }
+
+        // Point de comparaison honnête : en réel, la valeur du compte au premier
+        // cycle. Sans cela l'écart se mesurerait depuis le plafond de Réglages,
+        // qui n'a jamais été investi.
+        val reference = if (mode == Mode.LIVE) {
+            settings.liveBaseline(settings.symbol)
+                ?: value.also { settings.saveLiveBaseline(settings.symbol, it) }
+        } else {
+            settings.capitalEur
+        }
         if (decision.signal != Signal.HOLD) {
             log.addFirst(
                 LogEntry(System.currentTimeMillis(), decision.signal, price,
@@ -144,7 +161,8 @@ class TradingEngine(
             baseBalance = baseBalance,
             quoteCurrency = quoteCurrency,
             portfolioValue = value,
-            initialEur = settings.capitalEur,
+            initialEur = reference,
+            referenceLabel = if (mode == Mode.LIVE) "démarrage du bot" else "capital de départ",
             indicators = decision.indicators,
             candles = candles.takeLast(180),
             lastUpdate = System.currentTimeMillis(),

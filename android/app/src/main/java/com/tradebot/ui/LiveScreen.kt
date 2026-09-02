@@ -111,12 +111,19 @@ fun LiveScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     val diff = state.portfolioValue - state.initialEur
-                    if (state.portfolioValue > 0) {
+                    if (state.portfolioValue > 0 && state.initialEur > 0) {
                         Text(
                             formatMoney(diff, state.quoteCurrency) + " (" +
                                 formatPercent(diff / state.initialEur * 100) + ")",
                             color = if (diff >= 0) Green else Red,
                             fontSize = 12.sp,
+                        )
+                        // Dire depuis quand : un écart sans point de départ
+                        // explicite se lit comme une performance du bot.
+                        Text(
+                            "depuis ${state.referenceLabel}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.5.sp,
                         )
                     }
                 }
@@ -125,7 +132,8 @@ fun LiveScreen(
                     // compte, pas seulement ce que le bot a acheté lui-même.
                     val held =
                         if (mode == Mode.LIVE) state.baseBalance else state.positionSize
-                    Label(if (mode == Mode.LIVE) "Avoirs" else "Position")
+                    val asset = settings.symbol.substringBefore("/")
+                    Label(if (mode == Mode.LIVE) "Avoirs en $asset" else "Position")
                     Text(
                         if (held > 0) String.format("%.4f", held) else "—",
                         fontSize = 21.sp,
