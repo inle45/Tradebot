@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -63,8 +65,19 @@ fun LiveScreen(
                     fontSize = 38.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
+                // Le prix est coté dans la devise de la paire ; on rappelle
+                // sa contrepartie en euros pour éviter la confusion.
+                val rate = state.eurRate
+                if (rate != null && state.quoteCurrency != "EUR" && state.price > 0) {
+                    Text(
+                        "soit ${formatMoney(state.price * rate, "EUR")}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
                 SignalBadge(state.signal)
                 Text(
                     state.reason,
@@ -104,16 +117,29 @@ fun LiveScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 Card(Modifier.weight(1f)) {
                     Label("Portefeuille")
+                    // Le solde s'affiche en euros quelle que soit la paire :
+                    // c'est la monnaie dans laquelle on compte réellement.
+                    val rate = state.eurRate
+                    val inEuro = rate != null
                     Text(
-                        formatMoney(state.portfolioValue, state.quoteCurrency),
+                        if (inEuro) formatMoney(state.portfolioValue * rate!!, "EUR")
+                        else formatMoney(state.portfolioValue, state.quoteCurrency),
                         fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    if (inEuro && state.quoteCurrency != "EUR") {
+                        Text(
+                            "soit ${formatMoney(state.portfolioValue, state.quoteCurrency)}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                        )
+                    }
                     val diff = state.portfolioValue - state.initialEur
                     if (state.portfolioValue > 0 && state.initialEur > 0) {
                         Text(
-                            formatMoney(diff, state.quoteCurrency) + " (" +
+                            (if (inEuro) formatMoney(diff * rate!!, "EUR")
+                             else formatMoney(diff, state.quoteCurrency)) + " (" +
                                 formatPercent(diff / state.initialEur * 100) + ")",
                             color = if (diff >= 0) Green else Red,
                             fontSize = 12.sp,
@@ -140,9 +166,25 @@ fun LiveScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    // Ce que ces avoirs valent en euros, au prix du moment.
+                    val holdingsRate = state.eurRate
+                    if (held > 0 && holdingsRate != null && state.price > 0) {
+                        Text(
+                            "soit ${formatMoney(held * state.price * holdingsRate, "EUR")}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                        )
+                    }
                     Text(
                         state.entryPrice?.let { "entrée à ${formatMoney(it, state.quoteCurrency)}" }
-                            ?: "liquide : ${formatMoney(state.cash, state.quoteCurrency)}",
+                            ?: buildString {
+                                append("liquide : ")
+                                append(formatMoney(state.cash, state.quoteCurrency))
+                                val r = state.eurRate
+                                if (r != null && state.quoteCurrency != "EUR") {
+                                    append(" (${formatMoney(state.cash * r, "EUR")})")
+                                }
+                            },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                     )

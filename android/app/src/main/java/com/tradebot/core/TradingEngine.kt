@@ -34,6 +34,11 @@ data class EngineState(
     val initialEur: Double = 100.0,
     /** Ce que mesure l'écart affiché, pour ne pas le faire passer pour autre chose. */
     val referenceLabel: String = "capital de départ",
+    /**
+     * Valeur d'une unité de la devise de cotation en euros, quand elle est
+     * connue. Permet d'afficher en euros un compte tenu en USDC.
+     */
+    val eurRate: Double? = null,
     val indicators: Map<String, Double> = emptyMap(),
     val candles: List<Candle> = emptyList(),
     val lastUpdate: Long = 0L,
@@ -66,6 +71,22 @@ class TradingEngine(
 
     private var baseBalance: Double = 0.0
 
+    // Le taux de change bouge lentement : le rafraîchir à chaque cycle
+    // n'apporterait rien et alourdirait les appels à l'API.
+    private var eurRate: Double? = if (quoteCurrency == "EUR") 1.0 else null
+    private var eurRateFetchedAt = 0L
+
+    private fun refreshEurRate() {
+        val now = System.currentTimeMillis()
+        if (eurRate != null && now - eurRateFetchedAt < 5 * 60_000L) return
+        runCatching { client.eurRate(quoteCurrency) }.onSuccess {
+            if (it != null) {
+                eurRate = it
+                eurRateFetchedAt = now
+            }
+        }
+    }
+
     val log = ArrayDeque<LogEntry>()
 
     fun currentState(): EngineState = EngineState(
@@ -74,6 +95,7 @@ class TradingEngine(
         entryPrice = position?.entryPrice,
         baseBalance = baseBalance,
         quoteCurrency = quoteCurrency,
+        eurRate = eurRate,
         initialEur = settings.capitalEur,
     )
 
@@ -99,6 +121,8 @@ class TradingEngine(
             cash = balances[quoteCurrency] ?: 0.0
             baseBalance = balances[baseCurrency] ?: 0.0
         }
+
+        refreshEurRate()
 
         val candles = client.candles(settings.symbol, settings.intervalMinutes)
         if (candles.isEmpty()) {
@@ -163,6 +187,7 @@ class TradingEngine(
             portfolioValue = value,
             initialEur = reference,
             referenceLabel = if (mode == Mode.LIVE) "démarrage du bot" else "capital de départ",
+            eurRate = eurRate,
             indicators = decision.indicators,
             candles = candles.takeLast(180),
             lastUpdate = System.currentTimeMillis(),

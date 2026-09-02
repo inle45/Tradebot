@@ -127,14 +127,32 @@ class RevxClient(
         return rows.map { it.getString("symbol") }.distinct().take(top)
     }
 
-    fun price(symbol: String): Double {
+    /** Prix moyen de chaque paire, en un seul appel. */
+    fun tickers(): Map<String, Double> {
         val raw = request("GET", "/1.0/public/tickers", authenticated = false)
         val data = JSONObject(raw).getJSONArray("data")
-        for (i in 0 until data.length()) {
-            val row = data.getJSONObject(i)
-            if (row.getString("symbol") == symbol) return row.getString("mid").toDouble()
+        return buildMap {
+            for (i in 0 until data.length()) {
+                val row = data.getJSONObject(i)
+                val mid = row.optString("mid").toDoubleOrNull() ?: continue
+                put(row.getString("symbol"), mid)
+            }
         }
-        throw RevxException("Paire $symbol introuvable")
+    }
+
+    fun price(symbol: String): Double =
+        tickers()[symbol] ?: throw RevxException("Paire $symbol introuvable")
+
+    /**
+     * Combien vaut une unité de `currency` en euros — pour afficher un compte
+     * tenu en USDC dans la monnaie où l'utilisateur compte réellement.
+     */
+    fun eurRate(currency: String): Double? {
+        if (currency == "EUR") return 1.0
+        val quotes = tickers()
+        quotes["$currency/EUR"]?.let { if (it > 0) return it }
+        quotes["EUR/$currency"]?.let { if (it > 0) return 1.0 / it }
+        return null
     }
 
     // ---- Compte et trading (authentifié) ----
