@@ -30,9 +30,17 @@ class LiveTradingEngine:
         self.position, _ = state.load(state_path)
         self.last_decision = None
 
+    @staticmethod
+    def _rows(payload):
+        """Certaines routes renvoient un tableau nu (/1.0/balances), d'autres
+        l'enveloppent dans {"data": [...]}. On accepte les deux formes."""
+        if isinstance(payload, list):
+            return payload
+        return payload.get("data", []) if isinstance(payload, dict) else []
+
     def _candles(self):
         data = self.client.get_candles(self.config.symbol, self.config.candle_interval)
-        return data.get("data", data if isinstance(data, list) else [])
+        return self._rows(data)
 
     def _base_currency(self):
         return self.config.symbol.split("/")[0]
@@ -41,9 +49,7 @@ class LiveTradingEngine:
         return self.config.symbol.split("/")[1]
 
     def _available_balance(self, currency):
-        balances = self.client.get_balances()
-        rows = balances.get("data", balances if isinstance(balances, list) else [])
-        for b in rows:
+        for b in self._rows(self.client.get_balances()):
             if b.get("currency") == currency:
                 return float(b.get("available", 0))
         return 0.0

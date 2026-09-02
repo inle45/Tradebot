@@ -21,6 +21,8 @@ data class EngineState(
     val cash: Double = 0.0,
     val positionSize: Double = 0.0,
     val entryPrice: Double? = null,
+    /** Avoirs réels dans l'actif tradé, lus sur le compte en mode réel. */
+    val baseBalance: Double = 0.0,
     val portfolioValue: Double = 0.0,
     val initialEur: Double = 100.0,
     val indicators: Map<String, Double> = emptyMap(),
@@ -48,9 +50,12 @@ class TradingEngine(
         Position(entry, size, peak)
     }
 
-    // Devise de cotation ("EUR" dans "SOL/EUR") : c'est elle qu'on interroge
-    // pour connaître le vrai solde disponible en mode réel.
+    // "SOL/EUR" : SOL est l'actif tradé, EUR la devise qui sert à l'acheter.
+    // Ce sont ces deux soldes qu'on lit sur le compte en mode réel.
+    private val baseCurrency = settings.symbol.substringBefore("/")
     private val quoteCurrency = settings.symbol.substringAfter("/", "EUR")
+
+    private var baseBalance: Double = 0.0
 
     val log = ArrayDeque<LogEntry>()
 
@@ -58,6 +63,7 @@ class TradingEngine(
         cash = cash,
         positionSize = position?.size ?: 0.0,
         entryPrice = position?.entryPrice,
+        baseBalance = baseBalance,
         initialEur = settings.capitalEur,
     )
 
@@ -71,7 +77,7 @@ class TradingEngine(
         // chiffre local périmé — mieux vaut un cycle sans rien faire qu'un
         // ordre dimensionné sur un solde qu'on ne connaît plus.
         if (mode == Mode.LIVE) {
-            val fetched = runCatching { client.balance(quoteCurrency) }
+            val fetched = runCatching { client.balances() }
             val error = fetched.exceptionOrNull()
             if (error != null) {
                 return currentState().copy(
@@ -79,7 +85,9 @@ class TradingEngine(
                         "— le bot n'agit pas ce cycle.",
                 )
             }
-            cash = fetched.getOrThrow()
+            val balances = fetched.getOrThrow()
+            cash = balances[quoteCurrency] ?: 0.0
+            baseBalance = balances[baseCurrency] ?: 0.0
         }
 
         val candles = client.candles(settings.symbol, settings.intervalMinutes)
@@ -99,7 +107,13 @@ class TradingEngine(
 
         settings.savePosition(position?.entryPrice, position?.size, position?.peak, cash)
 
-        val value = cash + (position?.let { it.size * price } ?: 0.0)
+        // En réel, la valeur affichée est celle du compte tel qu'il est vraiment :
+        // liquide + avoirs, y compris ceux que le bot n'a pas achetés lui-même.
+        val value = if (mode == Mode.LIVE) {
+            cash + baseBalance * price
+        } else {
+            cash + (position?.let { it.size * price } ?: 0.0)
+        }
         if (decision.signal != Signal.HOLD) {
             log.addFirst(
                 LogEntry(System.currentTimeMillis(), decision.signal, price,
@@ -108,6 +122,13 @@ class TradingEngine(
             while (log.size > 50) log.removeLast()
         }
 
+        // Sans liquide sur le compte, un signal d'achat ne peut pas être exécuté.
+        // Mieux vaut le dire que laisser le bot paraître inactif sans raison.
+        val blocked = if (mode == Mode.LIVE && cash <= 0.0 && position == null) {
+            "Aucun $quoteCurrency disponible sur Revolut X : le bot ne peut rien " +
+                "acheter tant que le compte n'est pas approvisionné."
+        } else null
+
         return EngineState(
             price = price,
             signal = decision.signal,
@@ -115,11 +136,13 @@ class TradingEngine(
             cash = cash,
             positionSize = position?.size ?: 0.0,
             entryPrice = position?.entryPrice,
+            baseBalance = baseBalance,
             portfolioValue = value,
             initialEur = settings.capitalEur,
             indicators = decision.indicators,
             candles = candles.takeLast(180),
             lastUpdate = System.currentTimeMillis(),
+            error = blocked,
         )
     }
 

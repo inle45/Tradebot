@@ -139,16 +139,35 @@ class RevxClient(
 
     // ---- Compte et trading (authentifié) ----
 
-    fun balance(currency: String): Double {
-        val raw = request("GET", "/1.0/balances")
-        val data = JSONObject(raw).optJSONArray("data") ?: JSONArray()
-        for (i in 0 until data.length()) {
-            val row = data.getJSONObject(i)
-            if (row.optString("currency") == currency) {
-                return row.optString("available", "0").toDoubleOrNull() ?: 0.0
+    /** Soldes disponibles par devise, en un seul appel. */
+    fun balances(): Map<String, Double> = parseBalances(request("GET", "/1.0/balances"))
+
+    fun balance(currency: String): Double = balances()[currency] ?: 0.0
+
+    companion object {
+        /**
+         * L'endpoint des soldes répond par un tableau nu, mais d'autres routes
+         * enveloppent leur contenu dans `{"data": [...]}`. On accepte les deux :
+         * la forme exacte n'est pas garantie et une exception ici bloquerait
+         * tout le cycle de trading.
+         */
+        fun parseBalances(raw: String): Map<String, Double> {
+            val trimmed = raw.trim()
+            val rows = if (trimmed.startsWith("[")) {
+                JSONArray(trimmed)
+            } else {
+                JSONObject(trimmed).optJSONArray("data") ?: JSONArray()
+            }
+            return buildMap {
+                for (i in 0 until rows.length()) {
+                    val row = rows.optJSONObject(i) ?: continue
+                    val currency = row.optString("currency")
+                    if (currency.isNotBlank()) {
+                        put(currency, row.optString("available", "0").toDoubleOrNull() ?: 0.0)
+                    }
+                }
             }
         }
-        return 0.0
     }
 
     fun placeMarketOrder(

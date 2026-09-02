@@ -61,4 +61,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     testImplementation("junit:junit:4.13.2")
+    // Sur JVM, l'org.json d'Android n'est qu'une coquille qui lève une exception
+    // à chaque appel : sans cette implémentation réelle, aucun test ne peut
+    // couvrir le décodage des réponses de l'API.
+    testImplementation("org.json:json:20240303")
 }

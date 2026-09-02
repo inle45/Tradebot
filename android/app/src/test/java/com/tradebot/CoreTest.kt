@@ -7,6 +7,7 @@ import com.tradebot.core.DonchianBreakout
 import com.tradebot.core.Indicators
 import com.tradebot.core.MacdCrossover
 import com.tradebot.core.Position
+import com.tradebot.core.RevxClient
 import com.tradebot.core.RsiReversion
 import com.tradebot.core.Signal
 import com.tradebot.core.SmaCrossover
@@ -235,5 +236,35 @@ class CoreTest {
         val score = Backtester.score("avantage", consistent)
         assertTrue("un avantage régulier doit être détecté", score.significant)
         assertTrue(score.ciLow > 0)
+    }
+
+    // ---------- Lecture des soldes ----------
+
+    @Test
+    fun balancesParseTheArrayReturnedByRevolut() {
+        // Forme réellement renvoyée par /1.0/balances : un tableau nu. La
+        // supposer enveloppée dans {"data": ...} faisait échouer chaque cycle.
+        val raw = """
+            [{"currency":"EUR","available":"12.50","reserved":"0.00","total":"12.50"},
+             {"currency":"SOL","available":"1.127266","reserved":"0.000000","total":"1.127266"}]
+        """.trimIndent()
+        val balances = RevxClient.parseBalances(raw)
+        assertEquals(12.50, balances["EUR"]!!, 1e-9)
+        assertEquals(1.127266, balances["SOL"]!!, 1e-9)
+        assertNull(balances["BTC"])
+    }
+
+    @Test
+    fun balancesAlsoAcceptTheWrappedForm() {
+        val raw = """{"data":[{"currency":"EUR","available":"3.00"}]}"""
+        assertEquals(3.0, RevxClient.parseBalances(raw)["EUR"]!!, 1e-9)
+    }
+
+    @Test
+    fun balancesTolerateEmptyAndMalformedRows() {
+        assertTrue(RevxClient.parseBalances("[]").isEmpty())
+        assertTrue(RevxClient.parseBalances("""{"data":[]}""").isEmpty())
+        // Une ligne sans devise est ignorée plutôt que de faire échouer le cycle
+        assertTrue(RevxClient.parseBalances("""[{"available":"1.00"}]""").isEmpty())
     }
 }

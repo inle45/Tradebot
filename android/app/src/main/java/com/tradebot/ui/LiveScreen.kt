@@ -117,10 +117,13 @@ fun LiveScreen(
                     }
                 }
                 Card(Modifier.weight(1f)) {
-                    Label("Position")
+                    // En réel on affiche les avoirs réellement détenus sur le
+                    // compte, pas seulement ce que le bot a acheté lui-même.
+                    val held =
+                        if (mode == Mode.LIVE) state.baseBalance else state.positionSize
+                    Label(if (mode == Mode.LIVE) "Avoirs" else "Position")
                     Text(
-                        if (state.positionSize > 0)
-                            String.format("%.4f", state.positionSize) else "—",
+                        if (held > 0) String.format("%.4f", held) else "—",
                         fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
