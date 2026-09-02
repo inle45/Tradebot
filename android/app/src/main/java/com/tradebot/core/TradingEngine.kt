@@ -66,9 +66,20 @@ class TradingEngine(
         // En mode réel, la trésorerie affichée et utilisée pour dimensionner
         // les ordres vient toujours du vrai solde Revolut, jamais du compteur
         // virtuel de la simulation : sinon l'app pourrait engager plus (ou
-        // moins) que ce qui est réellement disponible sur le compte.
+        // moins) que ce qui est réellement disponible sur le compte. Si cet
+        // appel échoue, on l'affiche clairement au lieu de continuer avec un
+        // chiffre local périmé — mieux vaut un cycle sans rien faire qu'un
+        // ordre dimensionné sur un solde qu'on ne connaît plus.
         if (mode == Mode.LIVE) {
-            runCatching { client.balance(quoteCurrency) }.onSuccess { cash = it }
+            val fetched = runCatching { client.balance(quoteCurrency) }
+            val error = fetched.exceptionOrNull()
+            if (error != null) {
+                return currentState().copy(
+                    error = "Solde Revolut indisponible (${error.message ?: error::class.simpleName}) " +
+                        "— le bot n'agit pas ce cycle.",
+                )
+            }
+            cash = fetched.getOrThrow()
         }
 
         val candles = client.candles(settings.symbol, settings.intervalMinutes)
