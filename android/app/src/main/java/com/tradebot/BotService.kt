@@ -97,9 +97,22 @@ class BotService : LifecycleService() {
                     _state.value = _state.value.copy(error = e.message ?: "Erreur inconnue")
                     notify("Erreur : ${e.message?.take(60)}")
                 }
-                // Un cycle par minute : suffisant pour des bougies de 4h, et
-                // respectueux du quota de l'API.
+                // Un cycle complet par minute : suffisant pour des bougies de
+                // 4h, et respectueux du quota de l'API.
                 delay(60_000)
+            }
+        }
+
+        // Le prix affiché à l'écran se rafraîchit plus souvent que le cycle de
+        // décision : juste un ticker public, léger, pour que l'écran Direct
+        // se sente vraiment en direct entre deux cycles de trading.
+        lifecycleScope.launch(Dispatchers.IO) {
+            val settings = Settings(applicationContext)
+            val client = RevxClient(settings.apiKey, settings.privateKeyPem)
+            while (isActive && _running.value) {
+                runCatching { client.price(settings.symbol) }
+                    .onSuccess { fresh -> _state.value = _state.value.copy(price = fresh) }
+                delay(10_000)
             }
         }
         return START_STICKY

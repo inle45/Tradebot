@@ -48,6 +48,10 @@ class TradingEngine(
         Position(entry, size, peak)
     }
 
+    // Devise de cotation ("EUR" dans "SOL/EUR") : c'est elle qu'on interroge
+    // pour connaître le vrai solde disponible en mode réel.
+    private val quoteCurrency = settings.symbol.substringAfter("/", "EUR")
+
     val log = ArrayDeque<LogEntry>()
 
     fun currentState(): EngineState = EngineState(
@@ -59,6 +63,14 @@ class TradingEngine(
 
     /** Un cycle : récupère les prix, décide, agit, sauvegarde. */
     fun step(): EngineState {
+        // En mode réel, la trésorerie affichée et utilisée pour dimensionner
+        // les ordres vient toujours du vrai solde Revolut, jamais du compteur
+        // virtuel de la simulation : sinon l'app pourrait engager plus (ou
+        // moins) que ce qui est réellement disponible sur le compte.
+        if (mode == Mode.LIVE) {
+            runCatching { client.balance(quoteCurrency) }.onSuccess { cash = it }
+        }
+
         val candles = client.candles(settings.symbol, settings.intervalMinutes)
         if (candles.isEmpty()) {
             return currentState().copy(error = "Aucune donnée de prix reçue")
