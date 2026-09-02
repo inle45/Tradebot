@@ -64,7 +64,7 @@ fun SettingsScreen(
                         capital.toDoubleOrNull()?.let { v -> settings.capitalEur = v }
                         onChanged()
                     },
-                    label = { Text("Capital / plafond en euros") },
+                    label = { Text("Capital / plafond (en ${symbol.substringAfter("/", "EUR")})") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )

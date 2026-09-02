@@ -11,6 +11,7 @@ import com.tradebot.core.RevxClient
 import com.tradebot.core.RsiReversion
 import com.tradebot.core.Signal
 import com.tradebot.core.SmaCrossover
+import com.tradebot.ui.formatMoney
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -258,6 +259,15 @@ class CoreTest {
     fun balancesAlsoAcceptTheWrappedForm() {
         val raw = """{"data":[{"currency":"EUR","available":"3.00"}]}"""
         assertEquals(3.0, RevxClient.parseBalances(raw)["EUR"]!!, 1e-9)
+    }
+
+    @Test
+    fun moneyIsLabelledInTheQuoteCurrencyOfThePair() {
+        // Afficher « € » sur un compte en USDC donnerait une lecture fausse.
+        assertTrue(formatMoney(6.88, "EUR").contains("€"))
+        val usdc = formatMoney(6.88, "USDC")
+        assertTrue("USDC n'est pas un code ISO, il doit rester lisible : $usdc",
+            usdc.contains("USDC") && usdc.contains("6,88"))
     }
 
     @Test

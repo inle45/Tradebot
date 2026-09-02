@@ -32,6 +32,7 @@ fun PriceChart(
     candles: List<Candle>,
     shortPeriod: Int = 10,
     longPeriod: Int = 50,
+    currency: String = "EUR",
     modifier: Modifier = Modifier,
 ) {
     if (candles.size < 2) {
@@ -90,13 +91,13 @@ fun PriceChart(
 
         Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             Text(
-                formatEuro(low),
+                formatMoney(low, currency),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 modifier = Modifier.weight(1f),
             )
             Text(
-                formatEuro(high),
+                formatMoney(high, currency),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
             )

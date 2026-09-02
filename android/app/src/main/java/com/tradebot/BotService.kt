@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
+import java.util.Currency
 import java.util.Locale
 
 /**
@@ -64,7 +65,14 @@ class BotService : LifecycleService() {
         }
     }
 
-    private val euro = NumberFormat.getCurrencyInstance(Locale.FRANCE)
+    /** Montant dans la devise de la paire tradée (EUR, USDC…). */
+    private fun money(value: Double, currency: String): String {
+        val iso = runCatching { Currency.getInstance(currency) }.getOrNull()
+            ?: return String.format(Locale.FRANCE, "%,.2f %s", value, currency)
+        return NumberFormat.getCurrencyInstance(Locale.FRANCE)
+            .apply { this.currency = iso }
+            .format(value)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -90,8 +98,8 @@ class BotService : LifecycleService() {
                     _state.value = state
                     _log.value = engine.log.toList()
                     notify(
-                        "${state.signal} · ${euro.format(state.price)} · " +
-                            euro.format(state.portfolioValue)
+                        "${state.signal} · ${money(state.price, state.quoteCurrency)} · " +
+                            money(state.portfolioValue, state.quoteCurrency)
                     )
                 } catch (e: Exception) {
                     _state.value = _state.value.copy(error = e.message ?: "Erreur inconnue")

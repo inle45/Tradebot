@@ -25,6 +25,8 @@ fun BacktestScreen(
     onRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Un backtest est libellé dans la devise de cotation de la paire testée.
+    val quote = symbol.substringAfter("/", "EUR")
     LazyColumn(
         modifier.fillMaxSize().padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp),
@@ -79,15 +81,15 @@ fun BacktestScreen(
 
             item {
                 Card {
-                    KeyValue("Capital de départ", formatEuro(r.initialEur))
+                    KeyValue("Capital de départ", formatMoney(r.initialEur, quote))
                     KeyValue(
                         "Résultat de la stratégie",
-                        "${formatEuro(r.finalValue)}  (${formatPercent(r.returnPct)})",
+                        "${formatMoney(r.finalValue, quote)}  (${formatPercent(r.returnPct)})",
                         if (r.returnPct >= 0) Green else Red,
                     )
                     KeyValue(
                         "Acheter et ne rien faire",
-                        "${formatEuro(r.holdValue)}  (${formatPercent(r.holdReturnPct)})",
+                        "${formatMoney(r.holdValue, quote)}  (${formatPercent(r.holdReturnPct)})",
                     )
                     KeyValue("Exposition au marché", "${r.exposurePct.toInt()}%")
                     KeyValue("Nombre de trades", "${r.trades.size}")
@@ -114,7 +116,7 @@ fun BacktestScreen(
                         Column(Modifier.padding(top = 8.dp)) {
                             r.trades.takeLast(10).reversed().forEach { trade ->
                                 KeyValue(
-                                    "${formatEuro(trade.entryPrice)} → ${formatEuro(trade.exitPrice)}",
+                                    "${formatMoney(trade.entryPrice, quote)} → ${formatMoney(trade.exitPrice, quote)}",
                                     formatPercent(trade.profitPct),
                                     if (trade.profitPct >= 0) Green else Red,
                                 )

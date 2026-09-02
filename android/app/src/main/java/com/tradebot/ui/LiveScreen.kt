@@ -59,7 +59,7 @@ fun LiveScreen(
                     )
                 }
                 Text(
-                    if (state.price > 0) formatEuro(state.price) else "—",
+                    if (state.price > 0) formatMoney(state.price, state.quoteCurrency) else "—",
                     fontSize = 38.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -84,7 +84,11 @@ fun LiveScreen(
         item {
             Card {
                 Label("Prix et moyennes mobiles")
-                PriceChart(state.candles, modifier = Modifier.padding(top = 10.dp))
+                PriceChart(
+                    state.candles,
+                    currency = state.quoteCurrency,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
                 Row(
                     Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -101,7 +105,7 @@ fun LiveScreen(
                 Card(Modifier.weight(1f)) {
                     Label("Portefeuille")
                     Text(
-                        formatEuro(state.portfolioValue),
+                        formatMoney(state.portfolioValue, state.quoteCurrency),
                         fontSize = 21.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -109,7 +113,7 @@ fun LiveScreen(
                     val diff = state.portfolioValue - state.initialEur
                     if (state.portfolioValue > 0) {
                         Text(
-                            formatEuro(diff) + " (" +
+                            formatMoney(diff, state.quoteCurrency) + " (" +
                                 formatPercent(diff / state.initialEur * 100) + ")",
                             color = if (diff >= 0) Green else Red,
                             fontSize = 12.sp,
@@ -129,8 +133,8 @@ fun LiveScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        state.entryPrice?.let { "entrée à ${formatEuro(it)}" }
-                            ?: "liquide : ${formatEuro(state.cash)}",
+                        state.entryPrice?.let { "entrée à ${formatMoney(it, state.quoteCurrency)}" }
+                            ?: "liquide : ${formatMoney(state.cash, state.quoteCurrency)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                     )
@@ -203,7 +207,7 @@ fun LiveScreen(
                                 SignalBadge(entry.signal, small = true)
                                 Column(Modifier.padding(start = 10.dp).weight(1f)) {
                                     Text(
-                                        "${formatTime(entry.time)} · ${formatEuro(entry.price)}",
+                                        "${formatTime(entry.time)} · ${formatMoney(entry.price, state.quoteCurrency)}",
                                         fontSize = 12.5.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
                                     )

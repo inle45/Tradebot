@@ -23,6 +23,8 @@ data class EngineState(
     val entryPrice: Double? = null,
     /** Avoirs réels dans l'actif tradé, lus sur le compte en mode réel. */
     val baseBalance: Double = 0.0,
+    /** Devise avec laquelle on achète : "EUR" pour SOL/EUR, "USDC" pour SOL/USDC. */
+    val quoteCurrency: String = "EUR",
     val portfolioValue: Double = 0.0,
     val initialEur: Double = 100.0,
     val indicators: Map<String, Double> = emptyMap(),
@@ -64,6 +66,7 @@ class TradingEngine(
         positionSize = position?.size ?: 0.0,
         entryPrice = position?.entryPrice,
         baseBalance = baseBalance,
+        quoteCurrency = quoteCurrency,
         initialEur = settings.capitalEur,
     )
 
@@ -98,6 +101,7 @@ class TradingEngine(
         val price = candles.last().close
         val decision = strategy.decide(candles, position)
         var executed = false
+        rejection = null
 
         if (decision.signal == Signal.BUY && position == null) {
             executed = buy(price)
@@ -124,9 +128,10 @@ class TradingEngine(
 
         // Sans liquide sur le compte, un signal d'achat ne peut pas être exécuté.
         // Mieux vaut le dire que laisser le bot paraître inactif sans raison.
-        val blocked = if (mode == Mode.LIVE && cash <= 0.0 && position == null) {
+        val blocked = rejection ?: if (mode == Mode.LIVE && cash <= 0.0 && position == null) {
             "Aucun $quoteCurrency disponible sur Revolut X : le bot ne peut rien " +
-                "acheter tant que le compte n'est pas approvisionné."
+                "acheter tant que le compte n'est pas approvisionné. " +
+                "La paire ${settings.symbol} s'achète en $quoteCurrency."
         } else null
 
         return EngineState(
@@ -137,6 +142,7 @@ class TradingEngine(
             positionSize = position?.size ?: 0.0,
             entryPrice = position?.entryPrice,
             baseBalance = baseBalance,
+            quoteCurrency = quoteCurrency,
             portfolioValue = value,
             initialEur = settings.capitalEur,
             indicators = decision.indicators,
@@ -145,6 +151,13 @@ class TradingEngine(
             error = blocked,
         )
     }
+
+    /**
+     * Motif du dernier ordre refusé par la plateforme. Un ordre rejeté en
+     * silence (montant sous le minimum, fonds insuffisants) laisserait le bot
+     * paraître inactif sans qu'on sache pourquoi.
+     */
+    private var rejection: String? = null
 
     private fun buy(price: Double): Boolean {
         // Le plafond s'applique dans les deux modes : il borne le risque réel
@@ -155,11 +168,17 @@ class TradingEngine(
         return if (mode == Mode.LIVE) {
             runCatching {
                 client.placeMarketOrder(settings.symbol, "buy", quoteSize = budget)
-            }.map {
-                position = Position(price, budget * (1 - Fees.TAKER) / price, price)
-                cash -= budget
-                true
-            }.getOrDefault(false)
+            }.fold(
+                onSuccess = {
+                    position = Position(price, budget * (1 - Fees.TAKER) / price, price)
+                    cash -= budget
+                    true
+                },
+                onFailure = { error ->
+                    rejection = "Achat refusé : ${error.message ?: error::class.simpleName}"
+                    false
+                },
+            )
         } else {
             position = Position(price, budget * (1 - Fees.TAKER) / price, price)
             cash -= budget
@@ -172,11 +191,19 @@ class TradingEngine(
         return if (mode == Mode.LIVE) {
             runCatching {
                 client.placeMarketOrder(settings.symbol, "sell", baseSize = held.size)
-            }.map {
-                cash += held.size * price * (1 - Fees.TAKER)
-                position = null
-                true
-            }.getOrDefault(false)
+            }.fold(
+                onSuccess = {
+                    cash += held.size * price * (1 - Fees.TAKER)
+                    position = null
+                    true
+                },
+                onFailure = { error ->
+                    // La position reste ouverte : on n'invente pas une vente
+                    // qui n'a pas eu lieu.
+                    rejection = "Vente refusée : ${error.message ?: error::class.simpleName}"
+                    false
+                },
+            )
         } else {
             cash += held.size * price * (1 - Fees.TAKER)
             position = null
